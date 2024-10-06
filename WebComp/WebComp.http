@@ -1,0 +1,6 @@
+@WebComp_HostAddress = http://localhost:5117
+
+GET {{WebComp_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
