@@ -41,9 +41,6 @@ namespace DataAccess.Migrations
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
 
-                    b.Property<string>("UserName")
-                        .HasColumnType("text");
-
                     b.Property<string>("Vcard")
                         .HasColumnType("text");
 

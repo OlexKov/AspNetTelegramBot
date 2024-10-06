@@ -1,17 +1,19 @@
 ﻿
-using Ardalis.Specification.EntityFrameworkCore;
 using BusinessLogic.DTO;
 using Newtonsoft.Json;
 using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
-Console.WriteLine("Hello, World!");
+Console.WriteLine("Chat boot");
 string token = "7862031062:AAH2LFTmXTDRi0kFHTPBw1A_x5YWlyul2T0";
 List<long> adminsChatId = [5254681094];
+adminsChatId.AddRange((await GetUsersAsync(true)).Select(x=>x.Id));
+Console.WriteLine("Адміністраторів - " + adminsChatId.Count());
+List<long> usersChatId = new((await GetUsersAsync()).Select(x => x.Id));
+Console.WriteLine("Юзерів - " + usersChatId.Count());
 var client = new TelegramBotClient(token);
 client.StartReceiving(Update,Error);
 Console.ReadLine();
@@ -39,11 +41,15 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
                     switch (message?.Text?.ToLower())
                     {
                         case "/start":
-                            await client.SendTextMessageAsync(message.Chat.Id, "Будь ласка, поділіться своїм контактом", cancellationToken: token);
+                            if (!isUserExist(message.Chat.Id))
+                                await client.SendTextMessageAsync(message.Chat.Id, "Будь ласка, поділіться своїм контактом", cancellationToken: token);
+                            else
+                                await client.SendTextMessageAsync(message.Chat.Id, $"Привіт {message.Chat.Username} !!!", cancellationToken: token);
                             break;
 
                         default:
-                            await client.SendTextMessageAsync(message.Chat.Id, "Для початку поділіться своїм контактом", replyToMessageId: message.MessageId, cancellationToken: token);
+                            if (!isUserExist(message.Chat.Id))
+                                await client.SendTextMessageAsync(message.Chat.Id, "Для початку поділіться своїм контактом", replyToMessageId: message.MessageId, cancellationToken: token);
                             break;
                     }
                     break;
@@ -51,9 +57,10 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
                 case MessageType.Contact:
                     if (message.Contact != null) 
                     {
-                        long newUserId = await CreateUserAsync(message.Contact,message.Chat.Username);
+                        long newUserId = await CreateUserAsync(message.Contact);
                         if (newUserId != 0) 
-                        { 
+                        {
+                            usersChatId.Add(newUserId);
                         }
                         var phoneNumber = message?.Contact?.PhoneNumber;
                         Console.WriteLine($"Отримано номер телефону: {phoneNumber}");
@@ -90,12 +97,15 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
                     break;
                    
                 case MessageType.Contact:
-                    var newAdminChatId = message?.Contact?.UserId;
-                    if (newAdminChatId != null) 
+                    if (message.Contact != null)
                     {
-                        adminConsoleWriteLine($"Додано новаго адміністратора: {message?.Contact?.FirstName} {message?.Contact?.LastName}");
-                        adminsChatId.Add((long)newAdminChatId);
-                        await client.SendTextMessageAsync(newAdminChatId, "Привіт, адміністраторе! Ви отримали доступ до бота.", cancellationToken: token);
+                        long newAdminId = await CreateUserAsync(message.Contact,true);
+                        if (newAdminId != 0)
+                        {
+                            adminConsoleWriteLine($"Додано новаго адміністратора: {message?.Contact?.FirstName} {message?.Contact?.LastName}");
+                            adminsChatId.Add(newAdminId);
+                            await client.SendTextMessageAsync(newAdminId, "Привіт, адміністраторе! Ви отримали доступ до бота.", cancellationToken: token);
+                        }
                     }
                     break;
                 default:
@@ -114,12 +124,11 @@ void adminConsoleWriteLine(string messsage)
     Console.WriteLine(messsage);
 }
 
-async Task<long> CreateUserAsync(Contact contact,string? username,bool admin = false) 
+async Task<long> CreateUserAsync(Contact contact,bool admin = false) 
 {
     var user = new TelegramUserDto()
     {
         Id = contact.UserId ?? 0,
-        UserName = username,
         LastName = contact.LastName,
         FirstName = contact.FirstName,
         Vcard = contact.FirstName,
@@ -166,3 +175,5 @@ async Task<TelegramUserDto?> GetUsersByIdAsync(long id)
     }
     return null;
 }
+
+bool isUserExist(long id) => usersChatId.Contains(id);
