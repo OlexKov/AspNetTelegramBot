@@ -11,9 +11,9 @@ Console.WriteLine("Chat boot");
 string token = "7862031062:AAH2LFTmXTDRi0kFHTPBw1A_x5YWlyul2T0";
 List<long> adminsChatId = [5254681094];
 adminsChatId.AddRange((await GetUsersAsync(true)).Select(x=>x.Id));
-Console.WriteLine("Адміністраторів - " + adminsChatId.Count());
-List<long> usersChatId = new((await GetUsersAsync()).Select(x => x.Id));
-Console.WriteLine("Юзерів - " + usersChatId.Count());
+Console.WriteLine($"Admins - {adminsChatId.Count}");
+List<long> usersChatId = new((await GetUsersAsync()).AsParallel().Select(x => x.Id));
+Console.WriteLine($"Users - {usersChatId.Count}");
 var client = new TelegramBotClient(token);
 client.StartReceiving(Update,Error);
 Console.ReadLine();
@@ -58,16 +58,16 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
                     if (message.Contact != null) 
                     {
                         long newUserId = await CreateUserAsync(message.Contact);
-                        if (newUserId != 0) 
+                        if (newUserId != 0)
                         {
                             usersChatId.Add(newUserId);
-                        }
-                        var phoneNumber = message?.Contact?.PhoneNumber;
-                        Console.WriteLine($"Отримано номер телефону: {phoneNumber}");
-                        await client.SendTextMessageAsync(message.Chat.Id, $"Дякуємо! Ваш номер телефону: {phoneNumber}", cancellationToken: token);
-                        foreach (var adminId in adminsChatId)
-                        {
-                            await client.SendTextMessageAsync(adminId, $"Новий користувач: {message?.From?.Username}, номер телефону: {phoneNumber}", cancellationToken: token);
+                            var phoneNumber = message?.Contact?.PhoneNumber;
+                            Console.WriteLine($"Отримано номер телефону: {phoneNumber}");
+                            await client.SendTextMessageAsync(message.Chat.Id, $"Дякуємо! Ваш номер телефону: {phoneNumber}", cancellationToken: token);
+                            foreach (var adminId in adminsChatId)
+                            {
+                                await client.SendTextMessageAsync(adminId, $"Новий користувач: {message?.From?.Username}, номер телефону: {phoneNumber}", cancellationToken: token);
+                            }
                         }
                     }
                     
@@ -80,7 +80,6 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
         else 
         {
             //Admin commands
-            long adminChatId = message.Chat.Id;
             switch (message.Type)
             {
                 case MessageType.Text:
@@ -88,7 +87,7 @@ async Task Update(ITelegramBotClient client, Update update, CancellationToken to
                     switch (message?.Text?.ToLower())
                     {
                         case "/start":
-                            await client.SendTextMessageAsync(adminChatId, "Привіт, адміністраторе! Ви отримали доступ до бота.", cancellationToken: token);
+                            await client.SendTextMessageAsync(message.Chat.Id, "Привіт, адміністраторе! Ви отримали доступ до бота.", cancellationToken: token);
                             break;
 
                         default:
@@ -122,6 +121,7 @@ void adminConsoleWriteLine(string messsage)
     ConsoleColor consoleColor = Console.ForegroundColor;
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine(messsage);
+    Console.ForegroundColor = consoleColor;
 }
 
 async Task<long> CreateUserAsync(Contact contact,bool admin = false) 
